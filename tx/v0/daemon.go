@@ -11,11 +11,14 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/golang/protobuf/proto"
+
+	"github.com/nafcollective/fridgelethics-service/utils"
 )
 
 const (
 	ethProvider     = "wss://ropsten.infura.io/ws"                                         // Provider URL for Ethereum RPC API.
-	abiPath         = "./utils/Fridgelethics.abi"                                          // Path to contract ABI.
+	abiPath         = "../../utils/Fridgelethics.abi"                                      // Path to contract ABI.
 	contract        = "1CC7791Ce31426F79DdD66995c50aECC101233E5"                           // Contract's address without 0x.
 	claimEventTopic = "0x47cee97cb7acd717b3c0aa1435d004cd5b3c8c57d70dbceb4e4458bbd60e39d4" // Topic to filter for claim events only.
 )
@@ -66,7 +69,19 @@ func main() {
 			fmt.Println("Claim event received:")
 			fmt.Println("Address:", event.To.Hex())
 			fmt.Println("Value:", event.Value)
-			//TODO call polling service
+			go SendPollRequest(event.To.Bytes())
 		}
 	}
+}
+
+func SendPollRequest(address []byte) {
+	pr := &pb.PollRequest{
+		Address: address,
+	}
+	msg, err := proto.Marshal(pr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Sending message", msg)
+	//TODO send msg to polling service
 }
