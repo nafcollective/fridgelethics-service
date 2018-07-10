@@ -1,5 +1,5 @@
-// Package polling handles the association between an address and a user's fitness data
-package polling // import "github.com/nafcollective/fridgelethics-service/polling/v0"
+// Package main handles the association between an address and a user's fitness data
+package main // import "github.com/nafcollective/fridgelethics-service/polling/v0"
 
 import (
 	"context"
@@ -27,6 +27,7 @@ type service struct {
 }
 
 func (s service) Poll(_ context.Context, a []byte) (uint64, uint64) {
+	// TODO
 	return 0, 0
 }
 

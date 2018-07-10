@@ -1,4 +1,4 @@
-package polling // import "github.com/nafcollective/fridgelethics-service/polling/v0"
+package main // import "github.com/nafcollective/fridgelethics-service/polling/v0"
 
 import (
 	"golang.org/x/oauth2"
