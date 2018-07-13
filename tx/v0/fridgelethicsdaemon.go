@@ -9,9 +9,6 @@ import (
 	"log"
 
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/golang/protobuf/proto"
-
-	"github.com/nafcollective/fridgelethics-service/utils"
 )
 
 const (
@@ -37,42 +34,25 @@ func main() {
 	}
 
 	// Subscribe to claim events.
-	sub, logs := fc.WatchClaimEvents()
+	sub, logs := fc.watchClaimEvents()
 	if err != nil {
 		log.Fatal("Could not subscribe to claim event:", err)
 	}
 
 	// Wait for claim events.
 	fmt.Println("Watching for claim events...")
+
 	for {
 		select {
 		case err := <-sub.Err():
 			log.Fatal("Subscription error:", err)
 		case claim := <-logs:
 			fmt.Println("Claim event occured:")
-			fmt.Println("Address:", claim.To.Hex())
-			fmt.Println("Value:", claim.Value)
+			fmt.Println("	Address:", claim.To.Hex())
+			fmt.Println("	Value:", claim.Value)
 
-			//TODO check if value is sufficient
-
-			// Start new goroutine to check with polling service how many tokens can be claimed.
-			go queryClaimableTokens(claim.Value.Bytes())
+			// Handle the claim event in a new goroutine.
+			go fc.handleClaimEvent(claim.To, claim.Value)
 		}
 	}
-}
-
-// queryClaimableTokens packs the address received in a claim event into a PollRequest and sends it to the polling
-// service to verify tokens can be claimed by that address.
-func queryClaimableTokens(address []byte) {
-	pr := &pb.PollRequest{
-		Address: address,
-	}
-	msg, err := proto.Marshal(pr)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("Sending message", msg)
-	//TODO send msg to polling service
-	//TODO receive answer from polling service
-	//TODD call fc.Mint() if applicable
 }
