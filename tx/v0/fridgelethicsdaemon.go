@@ -9,18 +9,32 @@ import (
 	"log"
 
 	"github.com/ethereum/go-ethereum/ethclient"
+
+	"google.golang.org/grpc"
+
+	messages "github.com/nafcollective/fridgelethics-messages"
 )
 
 const (
-	ethProvider = "wss://ropsten.infura.io/ws"                                       // Provider URL for Ethereum RPC API.
-	contract    = "b73E516Df09582C043953A66E08E226b34F50711"                         // Contract's address without 0x.
-	privKey     = "036d96850f15365ec466915072df4447406da25f6f2c35773976d34561ee3af0" // Fridgelethics owner private key. //TODO do not use for production
+	pollingServer = "localhost:8082"                                                   // Server address of polling service server.
+	ethProvider   = "wss://ropsten.infura.io/ws"                                       // Provider URL for Ethereum RPC API.
+	contract      = "b73E516Df09582C043953A66E08E226b34F50711"                         // Contract's address without 0x.
+	privKey       = "036d96850f15365ec466915072df4447406da25f6f2c35773976d34561ee3af0" // Fridgelethics owner private key. //TODO do not use for production
 )
 
 // main starts the daemon by connecting to an ethereum node, instantiating a contract instance and watching for
 // claim events emitted by the contract. For each claim event a PollRequest is sent to the polling service (see
 // queryClaimableTokens).
 func main() {
+	// Set up the polling service client.
+	conn, err := grpc.Dial(pollingServer, grpc.WithInsecure()) //TODO add transport security
+	if err != nil {
+		log.Fatal("Cannot connect to polling service:", err)
+		return
+	}
+	defer conn.Close()
+	psc := messages.NewPollingServiceClient(conn)
+
 	// Set up eth ethClient to make RPC calls to.
 	ethClient, err := ethclient.Dial(ethProvider)
 	if err != nil {
@@ -52,7 +66,7 @@ func main() {
 			fmt.Println("	Value:", claim.Value)
 
 			// Handle the claim event in a new goroutine.
-			go fc.handleClaimEvent(claim.To, claim.Value)
+			go fc.handleClaimEvent(psc, claim.To, claim.Value)
 		}
 	}
 }

@@ -6,7 +6,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"math/big"
 	"strings"
@@ -18,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/golang/protobuf/proto"
 
 	messages "github.com/nafcollective/fridgelethics-messages"
 )
@@ -51,7 +49,7 @@ func NewFridgelethicsClient(ethClient *ethclient.Client, contract, privKey strin
 // handleClaimEvent gets called from the daemon when a new claim event was caught. It determines the
 // gas price for the mint transaction, queries the polling service for the amount of claimable tokens
 // of the sender and finally mints the new Fridgelethics tokens and credits them to the sender.
-func (fc FridgelethicsClient) handleClaimEvent(to common.Address, weiSent *big.Int) {
+func (fc FridgelethicsClient) handleClaimEvent(psc messages.PollingServiceClient, to common.Address, weiSent *big.Int) {
 	// Determine gas price to use for mint transaction depending on eth sent by the user.
 	gasPrice, err := fc.determineMintGasPrice(to, weiSent)
 	if err != nil {
@@ -65,9 +63,14 @@ func (fc FridgelethicsClient) handleClaimEvent(to common.Address, weiSent *big.I
 	}
 
 	// Query polling service for claimable tokens of that user.
-	amount, err := queryClaimableTokens(to.Bytes())
+	amount, err := queryClaimableTokens(psc, to.Bytes())
 	if err != nil {
 		log.Fatal("Could not query for claimable tokens:", err)
+		return
+	}
+	// Abort if no tokens are claimable.
+	if amount < 1 {
+		log.Fatal("No tokens claimable by address ", to.Hex())
 		return
 	}
 
@@ -146,19 +149,16 @@ func (fc FridgelethicsClient) mint(to common.Address, amount *big.Int) (tx *type
 	return fc.contractClient.Mint(fc.auth, to, amount)
 }
 
-// queryClaimableTokens packs the address received in a claim event into a PollRequest and sends it to the polling
-// service to verify tokens can be claimed by that address. It returns the number of claimable tokens.
-func queryClaimableTokens(address []byte) (tokens uint, err error) {
-	pr := &messages.PollRequest{
+// queryClaimableTokens makes a request to the polling service for the claimable tokens of the provided address.
+// It returns the number of tokens that user is eligible to claim.
+func queryClaimableTokens(psc messages.PollingServiceClient, address []byte) (tokens uint64, err error) {
+	preq := &messages.PollRequest{
 		Address: address,
 	}
-	msg, err := proto.Marshal(pr)
+	pres, err := psc.Poll(context.TODO(), preq) //TODO set timeout??
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Error calling polling service:", err)
+		return 0, err
 	}
-	fmt.Println("Sending message to polling service", msg)
-	//TODO send msg to polling service
-	//TODO receive answer from polling service
-	//TODO return claimable tokens
-	return 5, nil
+	return pres.ClaimableTokens, nil
 }
